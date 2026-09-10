@@ -1,21 +1,74 @@
 <div align="center">
 
-<img src="https://github.com/AtomicHalifax.png" width="100" alt="Athrva Raval"/>
+# TERRAADAPT
 
-# 🌍 TerraAdapt
+### Domain Adaptation for Satellite Image Classification
 
-### Adapting satellite vision models to a changing Earth.
-
-**A domain adaptation experiment using a pretrained EuroSAT ResNet50 model  
-on modern Sentinel-2 imagery and Dynamic World pseudo-labels.**
+**Adapting a pretrained EuroSAT ResNet50 model to a new Sentinel-2 + Dynamic World target domain.**
 
 <br>
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f172a,100:1e3a5f&height=150&section=header&text=EUROSAT%20%20%E2%86%92%20%20RESNET50%20%20%E2%86%92%20%20SENTINEL-2&fontSize=24&fontColor=ffffff&fontAlignY=55" width="100%" alt="TerraAdapt pipeline"/>
+`EUROSAT` &nbsp;→&nbsp; `RESNET50` &nbsp;→&nbsp; `DOMAIN ADAPTATION` &nbsp;→&nbsp; `SENTINEL-2`
 
 <br>
 
-`🛰️ Remote Sensing` &nbsp; `🧠 Deep Learning` &nbsp; `🔄 Domain Adaptation`
+<table>
+<tr>
+<td align="center"><b>4,057</b><br>Target Patches</td>
+<td align="center">•</td>
+<td align="center"><b>4</b><br>Target Classes</td>
+<td align="center">•</td>
+<td align="center"><b>224×224</b><br>RGB Input</td>
+<td align="center">•</td>
+<td align="center"><b>ResNet50</b><br>Backbone</td>
+</tr>
+</table>
+
+<br>
+
+**WATER** &nbsp;&nbsp; **TREES** &nbsp;&nbsp; **CROPS** &nbsp;&nbsp; **BUILT**
+
+<br><br>
+
+[![PyTorch](https://img.shields.io/badge/PyTorch-000000?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Sentinel-2](https://img.shields.io/badge/Sentinel--2-2F6B4F?style=flat-square)](https://sentinels.copernicus.eu/)
+[![ResNet50](https://img.shields.io/badge/ResNet50-111111?style=flat-square)](https://arxiv.org/abs/1512.03385)
+[![License](https://img.shields.io/badge/License-MIT-111111?style=flat-square)](LICENSE)
+
+</div>
+
+---
+
+## Overview
+
+**TerraAdapt** investigates how a strong land-cover classifier behaves when transferred from its original dataset to a different satellite-imagery domain.
+
+The project starts with a pretrained **ResNet50 model trained on EuroSAT** and adapts it to a new target dataset constructed from **Sentinel-2 imagery** with **Dynamic World pseudo-labels**.
+
+Rather than treating the target dataset as ordinary supervised classification, TerraAdapt focuses on the practical challenges of **domain shift, spatial generalization, and pseudo-label noise**.
+
+### Source → Target
+
+```text
+EuroSAT
+10-class land-cover model
+        │
+        ▼
+   Pretrained
+    ResNet50
+        │
+        ▼
+Replace 10-class head
+with 4-class target head
+        │
+        ▼
+Fine-tune selected layers
+        │
+        ▼
+Sentinel-2 + Dynamic World
+        │
+        ▼
+Water · Trees · Crops · Built
 
 </div>
 <div align="center">
