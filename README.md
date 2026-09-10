@@ -1,172 +1,154 @@
-````markdown
-# TerraAdapt
+<div align="center">
 
-**Domain Adaptation for Satellite Image Classification**
+# TERRA ADAPT
 
-![TerraAdapt Banner](figures/terraadapt_banner.png)
+### DOMAIN ADAPTATION FOR SATELLITE IMAGE CLASSIFICATION
 
-TerraAdapt explores how a pretrained land-cover classification model performs when transferred from its original **EuroSAT** domain to a new **Sentinel-2 + Dynamic World** target domain.
+**EuroSAT ResNet50 → Target-Domain Adaptation → Sentinel-2 + Dynamic World**
 
-The project starts with a pretrained **ResNet50** model and adapts it from 10 EuroSAT classes to four broader target classes: **Water, Trees, Crops, and Built**.
+<br>
+
+`EUROSAT`  →  `RESNET50`  →  `ADAPT`  →  `SENTINEL-2`
+
+<br>
+
+**WATER**  ·  **TREES**  ·  **CROPS**  ·  **BUILT**
+
+<br>
+
+![Python](https://img.shields.io/badge/Python-3.x-3776AB?style=flat-square\&logo=python\&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-ResNet50-EE4C2C?style=flat-square\&logo=pytorch\&logoColor=white)
+![Sentinel-2](https://img.shields.io/badge/Sentinel--2-Earth%20Observation-2E7D32?style=flat-square)
+![Dynamic World](https://img.shields.io/badge/Dynamic%20World-Pseudo--Labels-607D8B?style=flat-square)
+
+</div>
 
 ---
 
 ## Overview
 
-A strong source-domain model does not necessarily generalize to a different geographic, temporal, and label distribution.
+**TerraAdapt** is a domain-adaptation experiment for satellite image classification.
 
-TerraAdapt investigates this domain shift using a practical transfer-learning pipeline:
+The project starts from an existing **ResNet50 model trained on EuroSAT** and adapts it to a new target domain constructed from **Sentinel-2 imagery** with **Dynamic World labels**.
 
-```text
-EuroSAT
-   │
-   ▼
-Pretrained ResNet50
-   │
-   ▼
-10-class → 4-class head
-   │
-   ▼
-Target-domain adaptation
-   │
-   ▼
-Sentinel-2 + Dynamic World
-   │
-   ▼
-Water · Trees · Crops · Built
-````
+The goal is not simply to train another classifier, but to study how a model trained on one remote-sensing dataset behaves when transferred to a different geographic, temporal, and data-generation domain.
 
-The target dataset contains **4,057 RGB patches** generated from Sentinel-2 imagery and labeled using Dynamic World pseudo-labels.
+The target domain contains four broad land-cover classes:
+
+* Water
+* Trees
+* Crops
+* Built
+
+Dynamic World labels are treated as **pseudo-labels rather than ground truth**, which is an important limitation when interpreting the final results.
 
 ---
 
 ## Dataset
 
-### Target Dataset
+The target dataset was constructed using:
 
-| Property   | Value                   |
-| ---------- | ----------------------- |
-| Images     | 4,057                   |
-| Image Size | 224 × 224               |
-| Input      | RGB                     |
-| Imagery    | Sentinel-2              |
-| Labels     | Dynamic World           |
-| Classes    | 4                       |
-| Date Range | 2024-01-01 → 2025-01-01 |
-
-Sentinel-2 imagery was obtained from:
-
-`COPERNICUS/S2_SR_HARMONIZED`
-
-Dynamic World was used to construct target-domain pseudo-labels:
-
-`GOOGLE/DYNAMICWORLD/V1`
-
-Dynamic World labels are treated as **pseudo-labels rather than manually verified ground truth**.
+| Component         | Source                        |
+| ----------------- | ----------------------------- |
+| Satellite imagery | Sentinel-2                    |
+| Image collection  | `COPERNICUS/S2_SR_HARMONIZED` |
+| Target labels     | Dynamic World                 |
+| Label collection  | `GOOGLE/DYNAMICWORLD/V1`      |
+| Time range        | 2024-01-01 → 2025-01-01       |
+| Patch size        | 224 × 224                     |
+| Image format      | RGB                           |
+| Number of patches | 4,057                         |
+| Number of classes | 4                             |
 
 ### Target Classes
 
-| Target Class | Source Categories                  |
-| ------------ | ---------------------------------- |
-| Water        | River + SeaLake                    |
-| Trees        | Forest                             |
-| Crops        | AnnualCrop + PermanentCrop         |
-| Built        | Residential + Industrial + Highway |
+| ID | Class |
+| -: | ----- |
+|  0 | Water |
+|  1 | Trees |
+|  2 | Crops |
+|  3 | Built |
 
-`Pasture` and `HerbaceousVegetation` were excluded from the target mapping.
+The target classes were constructed by grouping Dynamic World / EuroSAT-compatible land-cover categories:
 
-### Class Mapping
+```text
+Water
+├── River
+└── SeaLake
 
-```python
-class_to_idx = {
-    "water": 0,
-    "trees": 1,
-    "crops": 2,
-    "built": 3
-}
+Trees
+└── Forest
+
+Crops
+├── AnnualCrop
+└── PermanentCrop
+
+Built
+├── Residential
+├── Industrial
+└── Highway
 ```
+
+`Pasture` and `HerbaceousVegetation` were excluded from the four-class target setup.
 
 ---
 
 ## Spatial Split
 
-To reduce geographic leakage, the target dataset was split spatially rather than using a purely random image-level split.
+A spatial split was used to reduce geographic leakage between training and evaluation data.
 
-| Split      | Samples |
-| ---------- | ------: |
-| Train      |   2,839 |
-| Validation |     609 |
-| Test       |     609 |
-| Total      |   4,057 |
+| Split      |   Samples |
+| ---------- | --------: |
+| Train      |     2,839 |
+| Validation |       609 |
+| Test       |       609 |
+| **Total**  | **4,057** |
 
-The final test set remained untouched until final evaluation.
+Spatial groups were kept together during the split rather than randomly distributing individual patches.
+
+The final test set remained untouched until the final evaluation.
 
 ---
 
 ## Spectral Analysis
 
-Three spectral indices were calculated during dataset analysis and quality control:
+Three spectral indices were calculated for analysis and quality checking:
 
 ### NDVI
 
-```text
-NDVI = (B8 - B4) / (B8 + B4)
-```
+$$
+NDVI = \frac{B8-B4}{B8+B4}
+$$
 
-NDVI provides a vegetation-related signal.
+NDVI provides a measure related to vegetation presence and vigor.
 
 ### GNDVI
 
-```text
-GNDVI = (B8 - B3) / (B8 + B3)
-```
+$$
+GNDVI = \frac{B8-B3}{B8+B3}
+$$
 
-GNDVI provides another vegetation-sensitive measurement using the green band.
+GNDVI uses the green band instead of red and provides another vegetation-sensitive measurement.
 
 ### NGRDI
 
-```text
-NGRDI = (B3 - B4) / (B3 + B4)
-```
+$$
+NGRDI = \frac{B3-B4}{B3+B4}
+$$
 
-NGRDI measures green-red spectral contrast.
+NGRDI captures differences between green and red reflectance and can provide additional information about vegetation and surface characteristics.
 
 These indices were used for **analysis and quality control only**.
 
-They were **not used as model inputs**.
-
-The model receives RGB imagery.
+They were **not provided as inputs to the ResNet50 model**.
 
 ---
 
-## Model
+## Source Model
 
-TerraAdapt uses **ResNet50** as the backbone.
+TerraAdapt starts from an existing **EuroSAT ResNet50** model.
 
-The starting point is an existing ResNet50 model trained on the EuroSAT dataset.
-
-### Source Model
-
-```text
-ResNet50
-    │
-    ▼
-2048-dimensional feature representation
-    │
-    ▼
-10-class classifier
-```
-
-Total parameters:
-
-**23,516,228**
-
-The source checkpoint contains a 10-class classifier:
-
-```text
-fc.weight → [10, 2048]
-fc.bias   → [10]
-```
+The source model was fine-tuned on the original EuroSAT task before being used as the pretrained starting point for target-domain adaptation.
 
 ### Source Performance
 
@@ -176,64 +158,100 @@ fc.bias   → [10]
 | F1 Score      | **0.9656** |
 | Macro ROC-AUC | **0.9977** |
 
+### Architecture
+
+```text
+ResNet50
+   ↓
+2048-dimensional feature representation
+   ↓
+10-class classifier
+```
+
+Total parameters:
+
+```text
+23,516,228
+```
+
+The source checkpoint contains a 10-class classification head:
+
+```text
+fc.weight → [10, 2048]
+fc.bias   → [10]
+```
+
 ---
 
 ## Adaptation
 
-The original 10-class classifier was replaced with:
+The original 10-class classifier was replaced with a four-class target-domain classifier:
 
 ```text
 Linear(2048 → 4)
 ```
 
-The four target classes are:
+The target architecture therefore becomes:
 
 ```text
-Water
-Trees
-Crops
-Built
+                 Pretrained EuroSAT
+                       ResNet50
+                          │
+                          ▼
+                 Feature Representation
+                       2048-d
+                          │
+                 Replace Source Head
+                          │
+                          ▼
+                    Linear(2048, 4)
+                          │
+                          ▼
+              Water / Trees / Crops / Built
 ```
 
-### Experiment 1
+### Initial Adaptation
 
-The first adaptation configuration fine-tuned:
+The initial adaptation fine-tuned:
 
 ```text
-ResNet50 layer4
-+
-Target classifier
+layer4 + classification head
 ```
 
-| Parameter Group |      Count |
+Parameter distribution:
+
+| Parameter Group | Parameters |
 | --------------- | ---------: |
 | Trainable       | 14,972,932 |
 | Frozen          |  8,543,296 |
 | Total           | 23,516,228 |
 
-### Experiment 2
+### Deeper Adaptation Experiment
 
 A deeper configuration additionally fine-tuned `layer3`:
 
 ```text
-ResNet50 layer3
-+
-ResNet50 layer4
-+
-Target classifier
+layer3 + layer4 + classification head
 ```
 
-| Parameter Group |      Count |
-| --------------- | ---------: |
-| Trainable       | 22,071,300 |
-| Frozen          |  1,444,928 |
-| Total           | 23,516,228 |
+| Configuration          | Trainable Parameters |
+| ---------------------- | -------------------: |
+| Layer 4 + FC           |           14,972,932 |
+| Layer 3 + Layer 4 + FC |           22,071,300 |
 
-The best validation checkpoint was selected for final testing.
+The deeper configuration left:
+
+```text
+1,444,928
+```
+
+parameters frozen.
 
 ---
 
 ## Results
+
+The model performed substantially better on the validation split than on the final untouched test set.
 
 ### Validation
 
@@ -248,8 +266,6 @@ The best validation checkpoint was selected for final testing.
 
 ### Final Test
 
-The selected model was evaluated once on the untouched target-domain test set.
-
 | Metric           |      Score |
 | ---------------- | ---------: |
 | Accuracy         | **54.02%** |
@@ -259,53 +275,118 @@ The selected model was evaluated once on the untouched target-domain test set.
 | Macro ROC-AUC    | **0.8259** |
 | Weighted ROC-AUC | **0.8252** |
 
-### Confusion Matrix
+### Final Test Confusion Matrix
 
 ```text
-                 Predicted
-
-              Water Trees Crops Built
-
-Actual Water    93    13    26    18
-       Trees    34    68    34    14
-       Crops     5    36    56    62
-       Built     2    16    20   112
+              Predicted
+             W    T    C    B
+Actual W    93   13   26   18
+       T    34   68   34   14
+       C     5   36   56   62
+       B     2   16   20  112
 ```
 
-Built performed strongest on the final test set, while Crops showed substantial confusion, particularly with Built.
+The final test results show that **Built** was the strongest class, while **Crops** was considerably more difficult.
+
+A notable source of confusion was:
+
+```text
+Crops → Built
+```
 
 ---
 
 ## Source vs Target
 
-One of the main observations from TerraAdapt is the difference between source-domain and target-domain performance.
+The difference between the original EuroSAT performance and TerraAdapt's final target-domain performance highlights the difficulty of transferring a model between remote-sensing domains.
 
-| Model                  |   Accuracy |
-| ---------------------- | ---------: |
-| EuroSAT source model   | **96.56%** |
-| TerraAdapt target test | **54.02%** |
+|               | EuroSAT Source | TerraAdapt Target |
+| ------------- | -------------: | ----------------: |
+| Classes       |             10 |                 4 |
+| Model         |       ResNet50 |          ResNet50 |
+| Accuracy      |     **96.56%** |        **54.02%** |
+| Macro F1      |     **0.9656** |        **0.5361** |
+| Macro ROC-AUC |     **0.9977** |        **0.8259** |
 
-The result demonstrates the difficulty of transferring a model across different remote-sensing domains.
+The results should not be interpreted as a failure of ResNet50 itself.
 
-The target imagery differs from the original training distribution in geographic coverage, acquisition period, dataset construction, and label definitions.
+Instead, they demonstrate that strong performance on a source dataset does not necessarily transfer directly to a new geographic, temporal, labeling, and imaging domain.
 
 ---
 
 ## Limitations
 
-The target labels come from **Dynamic World pseudo-labels**, so they should not be treated as equivalent to manually verified ground truth.
+Several limitations are important when interpreting TerraAdapt.
 
-Other important limitations include:
+### Dynamic World pseudo-labels
 
-* Geographic domain shift
-* Temporal domain shift
-* Differences between EuroSAT and target class definitions
-* Pseudo-label noise
-* Limited target-domain sample size
-* Spatially separated evaluation
-* Confusion between visually similar land-cover classes
+Dynamic World labels are automatically generated predictions rather than manually verified ground truth.
 
-Therefore, the final model should be viewed as an **experimental domain-adaptation model**, not a production-ready land-cover classifier.
+Therefore, target-domain evaluation contains potential label noise.
+
+### Domain shift
+
+The source and target datasets differ in:
+
+* Geographic distribution
+* Acquisition period
+* Dataset construction
+* Label-generation process
+* Image characteristics
+
+This creates a genuine domain-shift problem.
+
+### Target classes
+
+The four target classes are broad groupings constructed from multiple land-cover categories.
+
+This simplifies the original classification problem but can also introduce semantic overlap.
+
+### Final test performance
+
+The final untouched test accuracy of **54.02%** is relatively weak.
+
+The result is reported directly rather than selecting or tuning against the test set.
+
+---
+
+## Reproducibility
+
+The complete experimental workflow is documented in the notebook:
+
+```text
+notebooks/TerraAdapt.ipynb
+```
+
+The workflow covers:
+
+```text
+Sentinel-2 + Dynamic World
+          ↓
+Target Dataset Construction
+          ↓
+Candidate Selection
+          ↓
+Quality / Spectral Analysis
+          ↓
+Spatial Train / Validation / Test Split
+          ↓
+Load EuroSAT ResNet50
+          ↓
+Replace 10-Class Head
+          ↓
+Target-Domain Adaptation
+          ↓
+Validation
+          ↓
+Model Selection
+          ↓
+Untouched Test Evaluation
+```
+
+The dataset itself is **not included in this repository**.
+
+Large model checkpoints are also intentionally excluded from Git tracking.
 
 ---
 
@@ -334,7 +415,6 @@ TerraAdapt/
 │   └── README.md
 │
 └── figures/
-    ├── terraadapt_banner.png
     ├── dataset_samples.png
     ├── spatial_split.png
     ├── validation_confusion_matrix.png
@@ -346,43 +426,20 @@ TerraAdapt/
 
 ## Documentation
 
-Detailed project documentation is available in [`docs/`](docs/).
+Detailed project documentation:
 
-| Document                                            | Description                             |
-| --------------------------------------------------- | --------------------------------------- |
-| [`why.md`](docs/why.md)                             | Project motivation and research framing |
-| [`Data_Collection.md`](docs/Data_Collection.md)     | Target dataset construction             |
-| [`Feature_Catalog.md`](docs/Feature_Catalog.md)     | Input features and spectral indices     |
-| [`Model_Development.md`](docs/Model_Development.md) | Architecture and adaptation             |
-| [`Model_Evaluation.md`](docs/Model_Evaluation.md)   | Validation and test evaluation          |
-| [`Workflow.md`](docs/Workflow.md)                   | End-to-end workflow                     |
-
----
-
-## Reproducibility
-
-The complete workflow is available in:
-
-[`notebooks/TerraAdapt.ipynb`](notebooks/TerraAdapt.ipynb)
-
-The notebook covers:
-
-* Target dataset construction
-* Candidate selection
-* Dataset analysis
-* Spatial splitting
-* ResNet50 initialization
-* Classifier replacement
-* Adaptation experiments
-* Validation
-* Model selection
-* Final test evaluation
-
-Large datasets and model checkpoints are intentionally excluded from the repository.
+* [`why.md`](docs/why.md) — motivation and project reasoning
+* [`Data_Collection.md`](docs/Data_Collection.md) — target dataset construction
+* [`Feature_Catalog.md`](docs/Feature_Catalog.md) — model inputs and spectral analysis
+* [`Model_Development.md`](docs/Model_Development.md) — architecture and adaptation strategy
+* [`Model_Evaluation.md`](docs/Model_Evaluation.md) — validation and final test evaluation
+* [`Workflow.md`](docs/Workflow.md) — complete experimental workflow
 
 ---
 
 ## Requirements
+
+Main dependencies:
 
 ```text
 torch
@@ -395,7 +452,7 @@ Pillow
 jupyter
 ```
 
-Install dependencies with:
+Install with:
 
 ```bash
 pip install -r requirements.txt
@@ -403,9 +460,40 @@ pip install -r requirements.txt
 
 ---
 
-## License
+## Model Checkpoint
 
-This project is licensed under the MIT License.
+The best TerraAdapt model was saved as:
 
-````
-e banner look like a proper full-width visual and have GitHub render it reliably. The EuroSAT repo itself uses this exact general pattern of putting a visual image directly under the project heading, which is much closer to what you're asking for.
+```text
+terraadapt_resnet50_best.pth
+```
+
+Large checkpoint files are intentionally not committed to the repository.
+
+The notebook documents the model-loading and adaptation procedure.
+
+---
+
+## Key Takeaway
+
+TerraAdapt explores a simple but important question:
+
+> **How well does a strong satellite image classifier transfer to a different remote-sensing domain?**
+
+The experiment shows that high source-domain performance does not guarantee high target-domain performance.
+
+The gap between the **96.56% EuroSAT source accuracy** and the **54.02% final target-domain test accuracy** illustrates the practical difficulty of domain adaptation under geographic, temporal, and pseudo-label distribution shifts.
+
+The project therefore focuses not only on the final score, but on understanding **what changes when a model leaves the domain it was originally trained on**.
+
+---
+
+<div align="center">
+
+### TerraAdapt
+
+**Domain Adaptation for Satellite Image Classification**
+
+`EuroSAT` · `ResNet50` · `Sentinel-2` · `Dynamic World`
+
+</div>
