@@ -1,219 +1,411 @@
-```html
-<div align="center">
+````markdown
+# TerraAdapt
 
-<svg width="100%" viewBox="0 0 1200 430" xmlns="http://www.w3.org/2000/svg">
+**Domain Adaptation for Satellite Image Classification**
 
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#f4f7f5"/>
-    </linearGradient>
+![TerraAdapt Banner](figures/terraadapt_banner.png)
 
-    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#164e3b"/>
-      <stop offset="100%" stop-color="#4f8f73"/>
-    </linearGradient>
+TerraAdapt explores how a pretrained land-cover classification model performs when transferred from its original **EuroSAT** domain to a new **Sentinel-2 + Dynamic World** target domain.
 
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="12" stdDeviation="18"
-                    flood-color="#18382d" flood-opacity="0.10"/>
-    </filter>
+The project starts with a pretrained **ResNet50** model and adapts it from 10 EuroSAT classes to four broader target classes: **Water, Trees, Crops, and Built**.
 
-    <clipPath id="earthClip">
-      <circle cx="930" cy="205" r="145"/>
-    </clipPath>
-  </defs>
+---
 
-  <!-- Background -->
-  <rect width="1200" height="430" rx="28" fill="url(#bg)"/>
+## Overview
 
-  <!-- Editorial border -->
-  <rect x="18" y="18" width="1164" height="394" rx="22"
-        fill="none" stroke="#dfe6e2" stroke-width="1"/>
+A strong source-domain model does not necessarily generalize to a different geographic, temporal, and label distribution.
 
-  <!-- Technical grid -->
-  <g opacity="0.45" stroke="#dce5e0" stroke-width="1">
-    <line x1="55" y1="65" x2="1145" y2="65"/>
-    <line x1="55" y1="365" x2="1145" y2="365"/>
-    <line x1="55" y1="65" x2="55" y2="365"/>
-    <line x1="1145" y1="65" x2="1145" y2="365"/>
-  </g>
+TerraAdapt investigates this domain shift using a practical transfer-learning pipeline:
 
-  <!-- Small label -->
-  <text x="70" y="92"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="13"
-        font-weight="600"
-        letter-spacing="3"
-        fill="#5d6c65">
-    SATELLITE VISION / DOMAIN ADAPTATION
-  </text>
+```text
+EuroSAT
+   │
+   ▼
+Pretrained ResNet50
+   │
+   ▼
+10-class → 4-class head
+   │
+   ▼
+Target-domain adaptation
+   │
+   ▼
+Sentinel-2 + Dynamic World
+   │
+   ▼
+Water · Trees · Crops · Built
+````
 
-  <!-- Main title -->
-  <text x="68" y="165"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="66"
-        font-weight="800"
-        letter-spacing="-2"
-        fill="#111713">
-    TERRA
-  </text>
+The target dataset contains **4,057 RGB patches** generated from Sentinel-2 imagery and labeled using Dynamic World pseudo-labels.
 
-  <text x="68" y="225"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="66"
-        font-weight="800"
-        letter-spacing="-2"
-        fill="#285f49">
-    ADAPT
-  </text>
+---
 
-  <!-- Subtitle -->
-  <text x="72" y="264"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="17"
-        fill="#4c5953">
-    Adapting pretrained land-cover models
-  </text>
+## Dataset
 
-  <text x="72" y="288"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="17"
-        fill="#4c5953">
-    to a new Sentinel-2 target domain.
-  </text>
+### Target Dataset
 
-  <!-- Pipeline -->
-  <g font-family="Arial, Helvetica, sans-serif"
-     font-size="11"
-     font-weight="700"
-     letter-spacing="1">
+| Property   | Value                   |
+| ---------- | ----------------------- |
+| Images     | 4,057                   |
+| Image Size | 224 × 224               |
+| Input      | RGB                     |
+| Imagery    | Sentinel-2              |
+| Labels     | Dynamic World           |
+| Classes    | 4                       |
+| Date Range | 2024-01-01 → 2025-01-01 |
 
-    <rect x="70" y="322" width="92" height="31" rx="15"
-          fill="#ffffff" stroke="#cfd9d4"/>
-    <text x="116" y="342" text-anchor="middle" fill="#26342e">
-      EUROSAT
-    </text>
+Sentinel-2 imagery was obtained from:
 
-    <text x="174" y="343" fill="#7b8983">→</text>
+`COPERNICUS/S2_SR_HARMONIZED`
 
-    <rect x="190" y="322" width="92" height="31" rx="15"
-          fill="#ffffff" stroke="#cfd9d4"/>
-    <text x="236" y="342" text-anchor="middle" fill="#26342e">
-      RESNET50
-    </text>
+Dynamic World was used to construct target-domain pseudo-labels:
 
-    <text x="294" y="343" fill="#7b8983">→</text>
+`GOOGLE/DYNAMICWORLD/V1`
 
-    <rect x="310" y="322" width="128" height="31" rx="15"
-          fill="#285f49"/>
-    <text x="374" y="342" text-anchor="middle" fill="#ffffff">
-      ADAPTATION
-    </text>
+Dynamic World labels are treated as **pseudo-labels rather than manually verified ground truth**.
 
-    <text x="450" y="343" fill="#7b8983">→</text>
+### Target Classes
 
-    <rect x="466" y="322" width="112" height="31" rx="15"
-          fill="#ffffff" stroke="#cfd9d4"/>
-    <text x="522" y="342" text-anchor="middle" fill="#26342e">
-      SENTINEL-2
-    </text>
-  </g>
+| Target Class | Source Categories                  |
+| ------------ | ---------------------------------- |
+| Water        | River + SeaLake                    |
+| Trees        | Forest                             |
+| Crops        | AnnualCrop + PermanentCrop         |
+| Built        | Residential + Industrial + Highway |
 
-  <!-- Earth / satellite visual -->
-  <g filter="url(#shadow)">
-    <circle cx="930" cy="205" r="145" fill="#eef4f0"/>
-  </g>
+`Pasture` and `HerbaceousVegetation` were excluded from the target mapping.
 
-  <g clip-path="url(#earthClip)">
+### Class Mapping
 
-    <!-- Earth base -->
-    <circle cx="930" cy="205" r="145" fill="#dce9e2"/>
-
-    <!-- Stylized satellite imagery -->
-    <path d="M760 225
-             C820 165 855 190 890 155
-             C925 120 975 135 1005 168
-             C1035 200 1090 188 1115 225
-             L1115 370 L760 370 Z"
-          fill="#9fbea9"/>
-
-    <path d="M770 305
-             C820 260 850 285 885 250
-             C920 215 955 235 985 270
-             C1010 300 1060 292 1105 260
-             L1120 370 L760 370 Z"
-          fill="#6f9b81"/>
-
-    <!-- Water -->
-    <path d="M790 120
-             C845 150 860 175 850 205
-             C840 235 800 240 780 215
-             L760 120 Z"
-          fill="#b9d7d2"/>
-
-    <!-- Agricultural fields -->
-    <g opacity="0.72" stroke="#d8e7dc" stroke-width="4">
-      <line x1="895" y1="170" x2="855" y2="350"/>
-      <line x1="925" y1="155" x2="900" y2="350"/>
-      <line x1="955" y1="150" x2="945" y2="350"/>
-      <line x1="985" y1="165" x2="990" y2="350"/>
-      <line x1="1015" y1="185" x2="1035" y2="350"/>
-    </g>
-
-    <!-- Built area -->
-    <g fill="#73827a">
-      <rect x="1010" y="215" width="25" height="20"/>
-      <rect x="1040" y="225" width="35" height="27"/>
-      <rect x="1000" y="245" width="22" height="19"/>
-      <rect x="1060" y="260" width="27" height="23"/>
-    </g>
-
-  </g>
-
-  <!-- Earth outline -->
-  <circle cx="930" cy="205" r="145"
-          fill="none" stroke="#285f49" stroke-width="2"/>
-
-  <!-- Orbit -->
-  <ellipse cx="930" cy="205" rx="188" ry="63"
-           fill="none" stroke="#8ba99a"
-           stroke-width="1.5"
-           transform="rotate(-18 930 205)"/>
-
-  <!-- Satellite -->
-  <g transform="translate(1058 112) rotate(-18)">
-    <rect x="-20" y="-10" width="40" height="20"
-          rx="3" fill="#26342e"/>
-    <rect x="-52" y="-7" width="25" height="14"
-          fill="#9ab8aa"/>
-    <rect x="27" y="-7" width="25" height="14"
-          fill="#9ab8aa"/>
-    <line x1="0" y1="10" x2="0" y2="28"
-          stroke="#26342e" stroke-width="2"/>
-    <circle cx="0" cy="32" r="4" fill="#285f49"/>
-  </g>
-
-  <!-- Corner metadata -->
-  <text x="1090" y="350"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="11"
-        text-anchor="end"
-        letter-spacing="2"
-        fill="#68766f">
-    WATER · TREES · CROPS · BUILT
-  </text>
-
-  <text x="1090" y="372"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="10"
-        text-anchor="end"
-        letter-spacing="1.5"
-        fill="#89958f">
-    SENTINEL-2 / DYNAMIC WORLD
-  </text>
-
-</svg>
-
-</div>
+```python
+class_to_idx = {
+    "water": 0,
+    "trees": 1,
+    "crops": 2,
+    "built": 3
+}
 ```
+
+---
+
+## Spatial Split
+
+To reduce geographic leakage, the target dataset was split spatially rather than using a purely random image-level split.
+
+| Split      | Samples |
+| ---------- | ------: |
+| Train      |   2,839 |
+| Validation |     609 |
+| Test       |     609 |
+| Total      |   4,057 |
+
+The final test set remained untouched until final evaluation.
+
+---
+
+## Spectral Analysis
+
+Three spectral indices were calculated during dataset analysis and quality control:
+
+### NDVI
+
+```text
+NDVI = (B8 - B4) / (B8 + B4)
+```
+
+NDVI provides a vegetation-related signal.
+
+### GNDVI
+
+```text
+GNDVI = (B8 - B3) / (B8 + B3)
+```
+
+GNDVI provides another vegetation-sensitive measurement using the green band.
+
+### NGRDI
+
+```text
+NGRDI = (B3 - B4) / (B3 + B4)
+```
+
+NGRDI measures green-red spectral contrast.
+
+These indices were used for **analysis and quality control only**.
+
+They were **not used as model inputs**.
+
+The model receives RGB imagery.
+
+---
+
+## Model
+
+TerraAdapt uses **ResNet50** as the backbone.
+
+The starting point is an existing ResNet50 model trained on the EuroSAT dataset.
+
+### Source Model
+
+```text
+ResNet50
+    │
+    ▼
+2048-dimensional feature representation
+    │
+    ▼
+10-class classifier
+```
+
+Total parameters:
+
+**23,516,228**
+
+The source checkpoint contains a 10-class classifier:
+
+```text
+fc.weight → [10, 2048]
+fc.bias   → [10]
+```
+
+### Source Performance
+
+| Metric        |      Score |
+| ------------- | ---------: |
+| Test Accuracy | **96.56%** |
+| F1 Score      | **0.9656** |
+| Macro ROC-AUC | **0.9977** |
+
+---
+
+## Adaptation
+
+The original 10-class classifier was replaced with:
+
+```text
+Linear(2048 → 4)
+```
+
+The four target classes are:
+
+```text
+Water
+Trees
+Crops
+Built
+```
+
+### Experiment 1
+
+The first adaptation configuration fine-tuned:
+
+```text
+ResNet50 layer4
++
+Target classifier
+```
+
+| Parameter Group |      Count |
+| --------------- | ---------: |
+| Trainable       | 14,972,932 |
+| Frozen          |  8,543,296 |
+| Total           | 23,516,228 |
+
+### Experiment 2
+
+A deeper configuration additionally fine-tuned `layer3`:
+
+```text
+ResNet50 layer3
++
+ResNet50 layer4
++
+Target classifier
+```
+
+| Parameter Group |      Count |
+| --------------- | ---------: |
+| Trainable       | 22,071,300 |
+| Frozen          |  1,444,928 |
+| Total           | 23,516,228 |
+
+The best validation checkpoint was selected for final testing.
+
+---
+
+## Results
+
+### Validation
+
+| Metric           |      Score |
+| ---------------- | ---------: |
+| Accuracy         | **71.76%** |
+| Macro Precision  | **0.7444** |
+| Macro Recall     | **0.7191** |
+| Macro F1         | **0.7179** |
+| Macro ROC-AUC    | **0.8682** |
+| Weighted ROC-AUC | **0.8687** |
+
+### Final Test
+
+The selected model was evaluated once on the untouched target-domain test set.
+
+| Metric           |      Score |
+| ---------------- | ---------: |
+| Accuracy         | **54.02%** |
+| Macro Precision  | **0.5402** |
+| Macro Recall     | **0.5431** |
+| Macro F1         | **0.5361** |
+| Macro ROC-AUC    | **0.8259** |
+| Weighted ROC-AUC | **0.8252** |
+
+### Confusion Matrix
+
+```text
+                 Predicted
+
+              Water Trees Crops Built
+
+Actual Water    93    13    26    18
+       Trees    34    68    34    14
+       Crops     5    36    56    62
+       Built     2    16    20   112
+```
+
+Built performed strongest on the final test set, while Crops showed substantial confusion, particularly with Built.
+
+---
+
+## Source vs Target
+
+One of the main observations from TerraAdapt is the difference between source-domain and target-domain performance.
+
+| Model                  |   Accuracy |
+| ---------------------- | ---------: |
+| EuroSAT source model   | **96.56%** |
+| TerraAdapt target test | **54.02%** |
+
+The result demonstrates the difficulty of transferring a model across different remote-sensing domains.
+
+The target imagery differs from the original training distribution in geographic coverage, acquisition period, dataset construction, and label definitions.
+
+---
+
+## Limitations
+
+The target labels come from **Dynamic World pseudo-labels**, so they should not be treated as equivalent to manually verified ground truth.
+
+Other important limitations include:
+
+* Geographic domain shift
+* Temporal domain shift
+* Differences between EuroSAT and target class definitions
+* Pseudo-label noise
+* Limited target-domain sample size
+* Spatially separated evaluation
+* Confusion between visually similar land-cover classes
+
+Therefore, the final model should be viewed as an **experimental domain-adaptation model**, not a production-ready land-cover classifier.
+
+---
+
+## Project Structure
+
+```text
+TerraAdapt/
+│
+├── README.md
+├── LICENSE
+├── requirements.txt
+├── .gitignore
+│
+├── docs/
+│   ├── why.md
+│   ├── Data_Collection.md
+│   ├── Feature_Catalog.md
+│   ├── Model_Development.md
+│   ├── Model_Evaluation.md
+│   └── Workflow.md
+│
+├── notebooks/
+│   └── TerraAdapt.ipynb
+│
+├── models/
+│   └── README.md
+│
+└── figures/
+    ├── terraadapt_banner.png
+    ├── dataset_samples.png
+    ├── spatial_split.png
+    ├── validation_confusion_matrix.png
+    ├── validation_metrics.png
+    └── validation_roc_auc.png
+```
+
+---
+
+## Documentation
+
+Detailed project documentation is available in [`docs/`](docs/).
+
+| Document                                            | Description                             |
+| --------------------------------------------------- | --------------------------------------- |
+| [`why.md`](docs/why.md)                             | Project motivation and research framing |
+| [`Data_Collection.md`](docs/Data_Collection.md)     | Target dataset construction             |
+| [`Feature_Catalog.md`](docs/Feature_Catalog.md)     | Input features and spectral indices     |
+| [`Model_Development.md`](docs/Model_Development.md) | Architecture and adaptation             |
+| [`Model_Evaluation.md`](docs/Model_Evaluation.md)   | Validation and test evaluation          |
+| [`Workflow.md`](docs/Workflow.md)                   | End-to-end workflow                     |
+
+---
+
+## Reproducibility
+
+The complete workflow is available in:
+
+[`notebooks/TerraAdapt.ipynb`](notebooks/TerraAdapt.ipynb)
+
+The notebook covers:
+
+* Target dataset construction
+* Candidate selection
+* Dataset analysis
+* Spatial splitting
+* ResNet50 initialization
+* Classifier replacement
+* Adaptation experiments
+* Validation
+* Model selection
+* Final test evaluation
+
+Large datasets and model checkpoints are intentionally excluded from the repository.
+
+---
+
+## Requirements
+
+```text
+torch
+torchvision
+numpy
+pandas
+scikit-learn
+matplotlib
+Pillow
+jupyter
+```
+
+Install dependencies with:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## License
+
+This project is licensed under the MIT License.
+
+````
+e banner look like a proper full-width visual and have GitHub render it reliably. The EuroSAT repo itself uses this exact general pattern of putting a visual image directly under the project heading, which is much closer to what you're asking for.
